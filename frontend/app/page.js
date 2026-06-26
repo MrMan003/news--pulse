@@ -46,9 +46,8 @@ function NewsImage({ src, alt, className }) {
     );
   }
   
-  const imageUrl = src.startsWith('http') 
-    ? `${API_URL}/proxy-image?url=${encodeURIComponent(src)}` 
-    : src;
+  // USE DIRECT URL - NO PROXY
+  const imageUrl = src;
   
   return (
     <img
