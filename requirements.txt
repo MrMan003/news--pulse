@@ -10,3 +10,14 @@ pydantic==2.7.4
 numpy==1.26.4
 beautifulsoup4==4.12.2
 lxml==4.9.3
+flask
+requests
+beautifulsoup4
+feedparser
+trafilatura
+scikit-learn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+urllib3
+numpy

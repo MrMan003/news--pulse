@@ -19,6 +19,9 @@ from typing import List, Dict, Optional, Any, Set
 from collections import defaultdict
 import numpy as np
 from bs4 import BeautifulSoup
+from flask import Flask, jsonify, request
+import threading
+import atexit
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +34,9 @@ DB_URL = os.getenv("DATABASE_URL")
 if not DB_URL:
     logger.error("DATABASE_URL not set in environment")
     exit(1)
+
+# --- Flask App ---
+app = Flask(__name__)
 
 # --- News Sources (Only sources that reliably provide images) ---
 FEEDS: List[Dict[str, str]] = [
@@ -466,46 +472,87 @@ def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] 
     finally:
         db.close()
 
-# --- Run multiple times ---
-def run_multiple_times(n: int = 5) -> Dict[str, int]:
-    total_articles = 0
-    total_clusters = 0
-    
-    for i in range(n):
-        logger.info(f"=== RUN {i+1}/{n} ===")
-        articles = fetch_articles()
-        if articles:
-            result = cluster_and_store(articles)
-            total_articles += result.get('new_articles', 0)
-            total_clusters += result.get('clusters_created', 0)
-            logger.info(f"Run {i+1} complete: {result}")
-        else:
-            logger.info(f"Run {i+1}: No new articles")
-        
-        if i < n - 1:
-            time.sleep(2)
-    
-    logger.info(f"=== TOTAL: {total_articles} new articles, {total_clusters} clusters created ===")
-    return {"total_articles": total_articles, "total_clusters": total_clusters}
+# --- Run once (for manual triggering) ---
+def run_scraper_once() -> Dict[str, Any]:
+    logger.info("Starting scraper run...")
+    articles = fetch_articles()
+    if articles:
+        result = cluster_and_store(articles)
+        logger.info(f"Scraper run complete: {result}")
+        return result
+    else:
+        logger.info("No articles fetched")
+        return {"status": "completed", "new_articles": 0, "clusters_created": 0}
+
+# --- Flask Routes ---
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "running",
+        "service": "News Scraper",
+        "endpoints": {
+            "/": "Health check",
+            "/run": "Run scraper manually",
+            "/health": "Health check"
+        }
+    })
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
+
+@app.route('/run')
+def run_scraper():
+    """Manual trigger endpoint"""
+    try:
+        # Run the scraper in a separate thread so it doesn't block
+        thread = threading.Thread(target=run_scraper_once)
+        thread.start()
+        return jsonify({
+            "status": "started",
+            "message": "Scraper started in background",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Failed to start scraper: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/run-sync')
+def run_scraper_sync():
+    """Synchronous run (for cron jobs)"""
+    try:
+        result = run_scraper_once()
+        return jsonify({
+            "status": "completed",
+            "result": result,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Scraper failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# --- Background Scheduler (keeps the app awake) ---
+def scheduled_scraper():
+    """Run scraper every 10 minutes"""
+    while True:
+        try:
+            logger.info("=== SCHEDULED SCRAPE START ===")
+            run_scraper_once()
+            logger.info("=== SCHEDULED SCRAPE COMPLETE ===")
+        except Exception as e:
+            logger.error(f"Scheduled scraper failed: {e}")
+        time.sleep(600)  # 10 minutes
+
+# --- Start background scheduler thread ---
+scheduler_thread = threading.Thread(target=scheduled_scraper, daemon=True)
+scheduler_thread.start()
+atexit.register(lambda: logger.info("Shutting down..."))
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    import sys
+    # Get port from environment (Render sets this automatically)
+    port = int(os.getenv("PORT", 10000))
     
-    try:
-        if len(sys.argv) > 1 and sys.argv[1] == "--multiple":
-            n = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-            result = run_multiple_times(n)
-            print(f"Success: {result}")
-        else:
-            job_id = sys.argv[1] if len(sys.argv) > 1 else None
-            articles = fetch_articles()
-            if articles:
-                result = cluster_and_store(articles, job_id)
-                print(f"Success: {result}")
-            else:
-                print("No articles fetched")
-    except Exception as e:
-        logger.error(f"Scraper failed: {e}")
-        print(f"Error: {e}")
-        sys.exit(1)
+    # Run the Flask app
+    logger.info(f"Starting Flask app on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
