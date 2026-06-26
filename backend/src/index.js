@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { nanoid } = require('nanoid');
 const { Pool } = require('pg');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const dotenv = require('dotenv');
 const fs = require('fs');
 
@@ -78,18 +78,21 @@ function findPythonPath() {
     return env.PYTHON_PATH;
   }
   
-  // Try common Python paths on Render
+  // Try common Python paths
   const commonPaths = [
     '/usr/bin/python3',
     '/usr/local/bin/python3',
+    '/opt/anaconda3/envs/newspulse/bin/python',
+    '/opt/anaconda3/bin/python',
     'python3',
     'python'
   ];
   
   for (const p of commonPaths) {
     try {
-      const result = spawnSync(p, ['--version']);
+      const result = spawnSync(p, ['--version'], { timeout: 1000 });
       if (result.status === 0) {
+        console.log(`✅ Found Python at: ${p}`);
         return p;
       }
     } catch (e) {
@@ -97,13 +100,33 @@ function findPythonPath() {
     }
   }
   
-  return 'python3'; // Default fallback
+  console.warn('⚠️ Python not found, using default: python3');
+  return 'python3';
+}
+
+// Helper: Check if scraper exists
+function getScraperPath() {
+  const possiblePaths = [
+    path.join(__dirname, '..', env.SCRAPER_PATH, 'main.py'),
+    path.join(__dirname, '..', 'scraper', 'main.py'),
+    path.join(__dirname, '../scraper/main.py'),
+  ];
+  
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      console.log(`✅ Found scraper at: ${p}`);
+      return p;
+    }
+  }
+  
+  console.warn('⚠️ Scraper not found, using default path');
+  return path.join(__dirname, '..', env.SCRAPER_PATH, 'main.py');
 }
 
 // Helper: Run scraper with timeout
 function runScraper(jobId) {
   return new Promise((resolve, reject) => {
-    const scraperPath = path.join(__dirname, '..', env.SCRAPER_PATH, 'main.py');
+    const scraperPath = getScraperPath();
     const pythonPath = findPythonPath();
     
     // Check if scraper file exists
@@ -118,7 +141,8 @@ function runScraper(jobId) {
     
     const python = spawn(pythonPath, [scraperPath, jobId], {
       timeout: 300000,
-      env: process.env
+      env: process.env,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
     
     let output = '';
