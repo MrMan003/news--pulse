@@ -21,7 +21,7 @@ from collections import defaultdict
 import numpy as np
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
-from flask_cors import CORS  # <-- ADD THIS IMPORT
+from flask_cors import CORS
 import threading
 import atexit
 
@@ -39,7 +39,7 @@ if not DB_URL:
 
 # --- Flask App with CORS ---
 app = Flask(__name__)
-CORS(app)  # <-- ADD THIS LINE - Allows all origins
+CORS(app)  # Allow all origins
 
 # --- News Sources ---
 FEEDS: List[Dict[str, str]] = [
@@ -490,7 +490,8 @@ def home():
             "/health": "Health check",
             "/clusters": "Get all clusters with articles",
             "/ingest/trigger": "Trigger a scrape job (POST)",
-            "/ingest/status/<job_id>": "Check job status"
+            "/ingest/status/<job_id>": "Check job status",
+            "/proxy-image": "Proxy image requests"
         }
     })
 
@@ -572,6 +573,38 @@ def get_job_status(job_id):
     except Exception as e:
         logger.error(f"Failed to get job status: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route('/proxy-image')
+def proxy_image():
+    """Proxy image requests to avoid CORS issues"""
+    try:
+        image_url = request.args.get('url')
+        if not image_url:
+            return jsonify({"error": "Missing url parameter"}), 400
+        
+        # Validate URL
+        if not image_url.startswith(('http://', 'https://')):
+            return jsonify({"error": "Invalid URL"}), 400
+        
+        # Fetch the image with a timeout
+        response = requests.get(image_url, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to fetch image"}), response.status_code
+        
+        # Return the image with proper headers
+        return response.content, 200, {
+            'Content-Type': response.headers.get('Content-Type', 'image/jpeg'),
+            'Cache-Control': 'public, max-age=86400'
+        }
+    except requests.exceptions.Timeout:
+        logger.error(f"Image proxy timeout: {image_url}")
+        return jsonify({"error": "Timeout fetching image"}), 504
+    except Exception as e:
+        logger.error(f"Image proxy error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 # --- Background Scheduler ---
 def scheduled_scraper():
