@@ -11,6 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy import create_engine, Column, String, Text, DateTime, ForeignKey, Integer, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.exc import OperationalError, DBAPIError
 import logging
 import requests
 from requests.adapters import HTTPAdapter
@@ -84,12 +85,21 @@ class ScrapeRun(Base):
     clusters_created = Column(Integer, default=0)
     error_message = Column(Text)
 
-# --- Connect and create tables ---
+# --- Connect and create tables with connection pooling ---
 try:
-    engine = create_engine(DB_URL)
+    # Create engine with connection pooling settings to handle disconnections
+    engine = create_engine(
+        DB_URL,
+        pool_pre_ping=True,      # Check connection before using it
+        pool_recycle=300,        # Recycle connections every 5 minutes
+        pool_size=5,             # Maintain 5 connections in the pool
+        max_overflow=10,         # Allow up to 10 extra connections if needed
+        pool_timeout=30,         # Wait 30 seconds for a connection before timing out
+        echo=False               # Set to True for debugging SQL
+    )
     SessionLocal = sessionmaker(bind=engine)
     Base.metadata.create_all(engine)
-    logger.info("Database connection established")
+    logger.info("Database connection established with pooling settings")
 except Exception as e:
     logger.error(f"Failed to connect to database: {e}")
     exit(1)
@@ -102,6 +112,34 @@ def get_session_with_retry() -> requests.Session:
     session.mount('http://', adapter)
     session.mount('https://', adapter)
     return session
+
+# --- Database operation with retry ---
+def execute_db_with_retry(func, max_retries=3, delay=2):
+    """Execute a database function with retry logic for connection issues"""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except (OperationalError, DBAPIError) as e:
+            error_msg = str(e).lower()
+            # Only retry on connection-related errors
+            if ("ssl connection" in error_msg or 
+                "connection has been closed" in error_msg or
+                "could not connect" in error_msg or
+                "connection timed out" in error_msg):
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                    logger.info(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+                    # Refresh the engine connection
+                    if attempt == max_retries - 2:
+                        logger.info("Attempting to reconnect to database...")
+                        engine.dispose()
+                    continue
+            # If it's not a connection error or we've exhausted retries, raise it
+            raise
+        except Exception as e:
+            # Don't retry on other errors
+            raise
 
 # --- Extract image URL from RSS entry ---
 def extract_image_from_rss(entry) -> Optional[str]:
@@ -356,121 +394,125 @@ def fetch_articles() -> List[Dict[str, Any]]:
     logger.info(f"Fetched {len(articles)} total articles")
     return articles
 
-# --- Cluster and Store ---
+# --- Cluster and Store (with retry logic) ---
 def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] = None) -> Dict[str, Any]:
-    db = SessionLocal()
-    
-    try:
-        if not job_id:
-            job_id = str(uuid.uuid4())
+    def do_clustering():
+        db = SessionLocal()
         
-        scrape_run = ScrapeRun(id=str(uuid.uuid4()), job_id=job_id, status="running")
-        db.add(scrape_run)
-        db.commit()
-        
-        existing_urls = {row[0] for row in db.query(Article.url).all()}
-        seen_urls = set()
-        new_articles = []
-        
-        for a in raw_articles:
-            if a['url'] not in existing_urls and a['url'] not in seen_urls:
-                new_articles.append(a)
-                seen_urls.add(a['url'])
-        
-        if not new_articles:
-            db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
-                "status": "completed", "completed_at": datetime.now(timezone.utc)
-            })
+        try:
+            if not job_id:
+                job_id = str(uuid.uuid4())
+            
+            scrape_run = ScrapeRun(id=str(uuid.uuid4()), job_id=job_id, status="running")
+            db.add(scrape_run)
             db.commit()
-            return {"status": "completed", "new_articles": 0, "clusters_created": 0}
-        
-        logger.info(f"Processing {len(new_articles)} new articles...")
-        
-        if len(new_articles) < 5:
-            for a in new_articles:
-                db.add(Article(
-                    id=str(uuid.uuid4()), url=a['url'], title=a['title'],
-                    body=a['body'], summary=a.get('summary', ''), image_url=a.get('image_url'),
-                    source=a['source'], published_at=a['published_at']
-                ))
-            db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
-                "status": "completed", "completed_at": datetime.now(timezone.utc),
-                "articles_found": len(raw_articles), "articles_new": len(new_articles)
-            })
-            db.commit()
-            return {"status": "completed", "new_articles": len(new_articles), "clusters_created": 0}
-        
-        texts = [f"{a['title']}. {a['body'][:1000]}" for a in new_articles]
-        vectorizer = TfidfVectorizer(stop_words='english', max_features=1000, min_df=1)
-        tfidf_matrix = vectorizer.fit_transform(texts)
-        similarity_matrix = cosine_similarity(tfidf_matrix)
-        THRESHOLD = 0.25
-        
-        n = len(new_articles)
-        parent = list(range(n))
-        
-        def find(x):
-            while parent[x] != x:
-                parent[x] = parent[parent[x]]
-                x = parent[x]
-            return x
-        
-        def union(x, y):
-            rx, ry = find(x), find(y)
-            if rx != ry:
-                parent[ry] = rx
-        
-        for i in range(n):
-            for j in range(i + 1, n):
-                if similarity_matrix[i][j] >= THRESHOLD:
-                    union(i, j)
-        
-        groups = defaultdict(list)
-        for i in range(n):
-            groups[find(i)].append(i)
-        
-        clusters_created = 0
-        
-        for group_indices in groups.values():
-            if len(group_indices) >= 2:
-                cluster_group = [new_articles[i] for i in group_indices]
-                cluster_id = str(uuid.uuid4())
-                
-                pub_dates = [a['published_at'] for a in cluster_group]
-                label = cluster_group[0]['title'][:60]
-                
-                new_cluster = Cluster(
-                    id=cluster_id, label=label, article_count=len(cluster_group),
-                    start_time=min(pub_dates), end_time=max(pub_dates)
-                )
-                db.add(new_cluster)
-                db.flush()
-                
-                for a in cluster_group:
+            
+            existing_urls = {row[0] for row in db.query(Article.url).all()}
+            seen_urls = set()
+            new_articles = []
+            
+            for a in raw_articles:
+                if a['url'] not in existing_urls and a['url'] not in seen_urls:
+                    new_articles.append(a)
+                    seen_urls.add(a['url'])
+            
+            if not new_articles:
+                db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+                    "status": "completed", "completed_at": datetime.now(timezone.utc)
+                })
+                db.commit()
+                return {"status": "completed", "new_articles": 0, "clusters_created": 0}
+            
+            logger.info(f"Processing {len(new_articles)} new articles...")
+            
+            if len(new_articles) < 5:
+                for a in new_articles:
                     db.add(Article(
                         id=str(uuid.uuid4()), url=a['url'], title=a['title'],
                         body=a['body'], summary=a.get('summary', ''), image_url=a.get('image_url'),
-                        source=a['source'], published_at=a['published_at'], cluster_id=cluster_id
+                        source=a['source'], published_at=a['published_at']
                     ))
-                
-                clusters_created += 1
-        
-        db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
-            "status": "completed", "completed_at": datetime.now(timezone.utc),
-            "articles_found": len(raw_articles), "articles_new": len(new_articles),
-            "clusters_created": clusters_created
-        })
-        db.commit()
-        
-        logger.info(f"Created {clusters_created} clusters from {len(new_articles)} articles")
-        return {"status": "completed", "new_articles": len(new_articles), "clusters_created": clusters_created}
-        
-    except Exception as e:
-        logger.error(f"Pipeline failed: {e}")
-        db.rollback()
-        raise
-    finally:
-        db.close()
+                db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+                    "status": "completed", "completed_at": datetime.now(timezone.utc),
+                    "articles_found": len(raw_articles), "articles_new": len(new_articles)
+                })
+                db.commit()
+                return {"status": "completed", "new_articles": len(new_articles), "clusters_created": 0}
+            
+            texts = [f"{a['title']}. {a['body'][:1000]}" for a in new_articles]
+            vectorizer = TfidfVectorizer(stop_words='english', max_features=1000, min_df=1)
+            tfidf_matrix = vectorizer.fit_transform(texts)
+            similarity_matrix = cosine_similarity(tfidf_matrix)
+            THRESHOLD = 0.25
+            
+            n = len(new_articles)
+            parent = list(range(n))
+            
+            def find(x):
+                while parent[x] != x:
+                    parent[x] = parent[parent[x]]
+                    x = parent[x]
+                return x
+            
+            def union(x, y):
+                rx, ry = find(x), find(y)
+                if rx != ry:
+                    parent[ry] = rx
+            
+            for i in range(n):
+                for j in range(i + 1, n):
+                    if similarity_matrix[i][j] >= THRESHOLD:
+                        union(i, j)
+            
+            groups = defaultdict(list)
+            for i in range(n):
+                groups[find(i)].append(i)
+            
+            clusters_created = 0
+            
+            for group_indices in groups.values():
+                if len(group_indices) >= 2:
+                    cluster_group = [new_articles[i] for i in group_indices]
+                    cluster_id = str(uuid.uuid4())
+                    
+                    pub_dates = [a['published_at'] for a in cluster_group]
+                    label = cluster_group[0]['title'][:60]
+                    
+                    new_cluster = Cluster(
+                        id=cluster_id, label=label, article_count=len(cluster_group),
+                        start_time=min(pub_dates), end_time=max(pub_dates)
+                    )
+                    db.add(new_cluster)
+                    db.flush()
+                    
+                    for a in cluster_group:
+                        db.add(Article(
+                            id=str(uuid.uuid4()), url=a['url'], title=a['title'],
+                            body=a['body'], summary=a.get('summary', ''), image_url=a.get('image_url'),
+                            source=a['source'], published_at=a['published_at'], cluster_id=cluster_id
+                        ))
+                    
+                    clusters_created += 1
+            
+            db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+                "status": "completed", "completed_at": datetime.now(timezone.utc),
+                "articles_found": len(raw_articles), "articles_new": len(new_articles),
+                "clusters_created": clusters_created
+            })
+            db.commit()
+            
+            logger.info(f"Created {clusters_created} clusters from {len(new_articles)} articles")
+            return {"status": "completed", "new_articles": len(new_articles), "clusters_created": clusters_created}
+            
+        except Exception as e:
+            logger.error(f"Pipeline failed: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    
+    # Execute with retry logic
+    return execute_db_with_retry(do_clustering)
 
 # --- Run once (for manual triggering) ---
 def run_scraper_once() -> Dict[str, Any]:
@@ -493,6 +535,7 @@ def home():
         "endpoints": {
             "/": "Health check",
             "/run": "Run scraper manually",
+            "/run-sync": "Run scraper synchronously (for cron jobs)",
             "/health": "Health check"
         }
     })
