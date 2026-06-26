@@ -21,6 +21,7 @@ from collections import defaultdict
 import numpy as np
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
+from flask_cors import CORS  # <-- ADD THIS IMPORT
 import threading
 import atexit
 
@@ -36,8 +37,9 @@ if not DB_URL:
     logger.error("DATABASE_URL not set in environment")
     exit(1)
 
-# --- Flask App ---
+# --- Flask App with CORS ---
 app = Flask(__name__)
+CORS(app)  # <-- ADD THIS LINE - Allows all origins
 
 # --- News Sources ---
 FEEDS: List[Dict[str, str]] = [
