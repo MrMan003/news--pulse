@@ -396,14 +396,17 @@ def fetch_articles() -> List[Dict[str, Any]]:
 
 # --- Cluster and Store (with retry logic) ---
 def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] = None) -> Dict[str, Any]:
+    # Store job_id in outer scope to fix the variable access issue
+    outer_job_id = job_id
+    
     def do_clustering():
         db = SessionLocal()
         
         try:
-            if not job_id:
-                job_id = str(uuid.uuid4())
+            # Use the captured job_id or generate a new one
+            current_job_id = outer_job_id if outer_job_id else str(uuid.uuid4())
             
-            scrape_run = ScrapeRun(id=str(uuid.uuid4()), job_id=job_id, status="running")
+            scrape_run = ScrapeRun(id=str(uuid.uuid4()), job_id=current_job_id, status="running")
             db.add(scrape_run)
             db.commit()
             
@@ -417,7 +420,7 @@ def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] 
                     seen_urls.add(a['url'])
             
             if not new_articles:
-                db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+                db.query(ScrapeRun).filter(ScrapeRun.job_id == current_job_id).update({
                     "status": "completed", "completed_at": datetime.now(timezone.utc)
                 })
                 db.commit()
@@ -432,7 +435,7 @@ def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] 
                         body=a['body'], summary=a.get('summary', ''), image_url=a.get('image_url'),
                         source=a['source'], published_at=a['published_at']
                     ))
-                db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+                db.query(ScrapeRun).filter(ScrapeRun.job_id == current_job_id).update({
                     "status": "completed", "completed_at": datetime.now(timezone.utc),
                     "articles_found": len(raw_articles), "articles_new": len(new_articles)
                 })
@@ -494,7 +497,7 @@ def cluster_and_store(raw_articles: List[Dict[str, Any]], job_id: Optional[str] 
                     
                     clusters_created += 1
             
-            db.query(ScrapeRun).filter(ScrapeRun.id == scrape_run.id).update({
+            db.query(ScrapeRun).filter(ScrapeRun.job_id == current_job_id).update({
                 "status": "completed", "completed_at": datetime.now(timezone.utc),
                 "articles_found": len(raw_articles), "articles_new": len(new_articles),
                 "clusters_created": clusters_created
