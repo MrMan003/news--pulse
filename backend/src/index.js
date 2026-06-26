@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const { spawn } = require('child_process');
 const dotenv = require('dotenv');
+const fs = require('fs');
 
 dotenv.config();
 
@@ -31,18 +32,17 @@ const app = Fastify({
   }
 });
 
-// Database connection - with better timeout handling
+// Database connection
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000, // 5 second timeout
+  connectionTimeoutMillis: 5000,
   ssl: {
-    rejectUnauthorized: false // For Neon SSL
+    rejectUnauthorized: false
   }
 });
 
-// Test database connection - non-blocking
 pool.on('connect', () => {
   console.log('✅ Database connected successfully');
 });
@@ -51,7 +51,7 @@ pool.on('error', (err) => {
   console.error('❌ Database pool error:', err.message);
 });
 
-// Job tracking with cleanup
+// Job tracking
 const jobs = new Map();
 
 // Clean up old jobs every hour
@@ -71,11 +71,46 @@ app.register(require('@fastify/cors'), {
   credentials: true
 });
 
+// Helper: Find Python path
+function findPythonPath() {
+  // Try environment variable first
+  if (env.PYTHON_PATH && env.PYTHON_PATH !== 'python3') {
+    return env.PYTHON_PATH;
+  }
+  
+  // Try common Python paths on Render
+  const commonPaths = [
+    '/usr/bin/python3',
+    '/usr/local/bin/python3',
+    'python3',
+    'python'
+  ];
+  
+  for (const p of commonPaths) {
+    try {
+      const result = spawnSync(p, ['--version']);
+      if (result.status === 0) {
+        return p;
+      }
+    } catch (e) {
+      // Continue to next path
+    }
+  }
+  
+  return 'python3'; // Default fallback
+}
+
 // Helper: Run scraper with timeout
 function runScraper(jobId) {
   return new Promise((resolve, reject) => {
     const scraperPath = path.join(__dirname, '..', env.SCRAPER_PATH, 'main.py');
-    const pythonPath = env.PYTHON_PATH || 'python3';
+    const pythonPath = findPythonPath();
+    
+    // Check if scraper file exists
+    if (!fs.existsSync(scraperPath)) {
+      reject(new Error(`Scraper file not found: ${scraperPath}`));
+      return;
+    }
     
     console.log(`🐍 Running scraper with: ${pythonPath}`);
     console.log(`📁 Scraper path: ${scraperPath}`);
@@ -144,17 +179,33 @@ function runScraper(jobId) {
 
 // ============ ROUTES ============
 
+// Root route
+app.get('/', async () => {
+  return { 
+    name: 'News Pulse API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      clusters: '/clusters',
+      timeline: '/timeline',
+      ingest: '/ingest/trigger',
+      status: '/ingest/status/:jobId',
+      proxy: '/proxy-image?url=...'
+    }
+  };
+});
+
 // Health check
 app.get('/health', async (request, reply) => {
   try {
-    // Test database connection
     const client = await pool.connect();
     client.release();
     return { 
       status: 'ok', 
       timestamp: new Date().toISOString(),
       database: 'connected',
-      python: env.PYTHON_PATH,
+      python: findPythonPath(),
       environment: env.NODE_ENV
     };
   } catch (err) {
@@ -163,13 +214,13 @@ app.get('/health', async (request, reply) => {
       timestamp: new Date().toISOString(),
       database: 'disconnected',
       error: err.message,
-      python: env.PYTHON_PATH,
+      python: findPythonPath(),
       environment: env.NODE_ENV
     };
   }
 });
 
-// ============ IMAGE PROXY ROUTE ============
+// Image Proxy
 app.get('/proxy-image', async (request, reply) => {
   try {
     const { url } = request.query;
@@ -443,30 +494,13 @@ app.get('/ingest/status/:jobId', async (request, reply) => {
   }
 });
 
-// Root route
-app.get('/', async () => {
-  return { 
-    name: 'News Pulse API',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      health: '/health',
-      clusters: '/clusters',
-      timeline: '/timeline',
-      ingest: '/ingest/trigger',
-      status: '/ingest/status/:jobId',
-      proxy: '/proxy-image?url=...'
-    }
-  };
-});
-
 // Start server
 const start = async () => {
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     app.log.info(`🚀 Server running on port ${env.PORT}`);
     app.log.info(`📊 Database: Connected`);
-    app.log.info(`🐍 Python: ${env.PYTHON_PATH}`);
+    app.log.info(`🐍 Python: ${findPythonPath()}`);
     app.log.info(`🖼️  Image proxy: enabled`);
     app.log.info(`🌍 Environment: ${env.NODE_ENV}`);
   } catch (err) {
