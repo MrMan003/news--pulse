@@ -64,11 +64,18 @@ setInterval(() => {
   }
 }, 3600000);
 
-// CORS
+// ============ CORS - FIXED ============
 app.register(require('@fastify/cors'), {
-  origin: env.CORS_ORIGIN.split(','),
+  origin: [
+    'https://news-pulse-tvh9.vercel.app',
+    'https://news-pulse-frontend.vercel.app',
+    'https://news-pulse-2xcf.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 });
 
 // Helper: Find Python path
