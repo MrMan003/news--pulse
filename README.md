@@ -21,6 +21,46 @@ A full-stack news aggregation and clustering application that automatically scra
 
 ***
 
+## Screenshots
+
+### Home Timeline
+![Home View]
+<img width="1710" height="1112" alt="image" src="https://github.com/user-attachments/assets/0ea7550d-f0e7-4d79-8dfd-af5864374b59" />
+
+*The main dashboard showing clustered news stories on a timeline*
+
+### Topics View
+![Topics View]
+<img width="1710" height="1112" alt="image" src="https://github.com/user-attachments/assets/eda57586-81ea-4dc0-be9b-798e9d1223a4" />
+
+*All topics displayed as cards with intensity indicators*
+
+### Live Feed
+![Live Feed]
+<img width="1710" height="1112" alt="image" src="https://github.com/user-attachments/assets/4514d49a-e536-4ccd-ab18-da23b40bd579" />
+
+*Chronological feed of news clusters*
+
+### Analytics
+![Analytics]
+<img width="1710" height="1112" alt="image" src="https://github.com/user-attachments/assets/a821575d-9d4e-46d4-af2e-9fd8e608b58e" />
+
+*Source distribution and statistics*
+
+### Cluster Detail
+![Cluster Detail]
+<img width="1710" height="1112" alt="image" src="https://github.com/user-attachments/assets/2ff115c5-061d-4ce1-ba1b-43eca03c599d" />
+
+*Slide-out panel showing all articles in a cluster*
+
+### Mobile Responsive
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/e4f1ce40-d07b-45cd-ab81-d100606dd28b" /> width="250" alt="Mobile Home" />
+  <img src="screenshots/mobile-topics.png" width="250" alt="Mobile Topics" />
+  <br>
+  <em>Mobile views showing responsive design</em>
+</div>
+
 ## Features
 
 * **Automated News Scraping:** Fetches articles from BBC, Al Jazeera, CNN, Fox News, NBC News, and Sky News.
