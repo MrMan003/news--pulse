@@ -55,8 +55,9 @@ A full-stack news aggregation and clustering application that automatically scra
 
 ### Mobile Responsive
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/e4f1ce40-d07b-45cd-ab81-d100606dd28b" /> width="250" alt="Mobile Home" />
-  <img src="screenshots/mobile-topics.png" width="250" alt="Mobile Topics" />
+  <img src="Image 3.png" width="250" alt="Mobile Home" />
+  <img src="Image.png" width="250" alt="Mobile Topics" />
+  <img src="Image 2.png" width="250" alt="Mobile Topics" />
   <br>
   <em>Mobile views showing responsive design</em>
 </div>
