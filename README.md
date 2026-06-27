@@ -2,18 +2,24 @@
 
 ![Python](https://img.shields.io/badge/Python-3.13.5-blue?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-API-black?logo=flask&logoColor=white)
+![Fastify](https://img.shields.io/badge/Fastify-API-000000?logo=fastify&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-336791?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 A full-stack news aggregation and clustering application that automatically scrapes news from 7 major sources, groups similar articles together using machine learning, and presents them through a modern, interactive web interface.
 
+***
+
 ## Live Demo
 
 * **Frontend:** [https://news-pulse-tvh9.vercel.app](https://news-pulse-tvh9.vercel.app)
-* **Backend API:** [https://news-pulse-1.onrender.com](https://news-pulse-1.onrender.com)
-* **API Health Check:** [https://news-pulse-1.onrender.com/health](https://news-pulse-1.onrender.com/health)
-* **Clusters Endpoint:** [https://news-pulse-1.onrender.com/clusters](https://news-pulse-1.onrender.com/clusters)
+* **Node.js Backend API:** [https://news-pulse-2xcf.onrender.com](https://news-pulse-2xcf.onrender.com)
+* **Python Scraper Service:** [https://news-pulse-1.onrender.com](https://news-pulse-1.onrender.com)
+* **API Health Check:** [https://news-pulse-2xcf.onrender.com/health](https://news-pulse-2xcf.onrender.com/health)
+* **Clusters Endpoint:** [https://news-pulse-2xcf.onrender.com/clusters](https://news-pulse-2xcf.onrender.com/clusters)
+
+***
 
 ## Features
 
@@ -24,142 +30,80 @@ A full-stack news aggregation and clustering application that automatically scra
 * **Auto-scheduling:** Background scraper runs autonomously every 10 minutes.
 * **Modern UI:** Dark-themed, responsive design with Framer Motion animations.
 * **Free Tier Ready:** Deployed optimally on the free tiers of Render, Vercel, and Neon.
+* **Separate Services:** Node.js API and Python scraper run as independent services for better scalability and maintainability.
+
+***
 
 ## Architecture
 
 ### High-Level Overview
 
-The system follows a consolidated two-tier architecture, combining the REST API and the data science scraping pipeline into a unified Python environment. This eliminates unnecessary network hops, keeps API responses in the sub-ms range, and simplifies the deployment strategy.
+The system follows a three-tier architecture with separate backend services:
 
-```text
-+---------------------------------------------------------------------------------+
-|                            NEWS PULSE ARCHITECTURE                              |
-+---------------------------------------------------------------------------------+
-|                                                                                 |
-|  +----------------+     +----------------+     +----------------+               |
-|  |   Frontend     |     |   Backend      |     |   Database     |               |
-|  |   (Vercel)     |---->|   (Render)     |---->|    (Neon)      |               |
-|  |   Next.js 15   |     |   Flask        |     |  PostgreSQL    |               |
-|  +----------------+     +----------------+     +----------------+               |
-|        |                       |                      |                         |
-|        v                       v                      v                         |
-|  +----------------+     +----------------+     +----------------+               |
-|  |   User         |     |   Scraper      |     |   Clusters     |               |
-|  |   Interface    |     |   Service      |     |   Articles     |               |
-|  |  (Tailwind)    |     |   (Python)     |     |   ScrapeRun    |               |
-|  +----------------+     +----------------+     +----------------+               |
-|        |                       |                      |                         |
-|        v                       v                      v                         |
-|  +----------------+     +----------------+     +----------------+               |
-|  |  Framer        |     |  Scheduler     |     |  Image         |               |
-|  |  Motion        |     |  (Thread)      |     |  Proxy         |               |
-|  |  Animations    |     |  Every 10min   |     |  Service       |               |
-|  +----------------+     +----------------+     +----------------+               |
-|                                                                                 |
-+---------------------------------------------------------------------------------+
+* **Node.js + Fastify Backend:** Handles all REST API requests, job management, and image proxying.
+* **Python + Flask Scraper:** Handles RSS ingestion, content extraction, and machine learning clustering.
+* **Shared PostgreSQL Database:** Stores clusters, articles, and scrape run metadata.
 
-```
-
-### Detailed Component Architecture
+This separation of concerns allows each service to scale independently and keeps the API layer lightweight and responsive.
 
 ```text
 +=================================================================================+
-|                          DETAILED SYSTEM ARCHITECTURE                           |
+|                       THREE-TIER SYSTEM ARCHITECTURE                            |
 +=================================================================================+
 |                                                                                 |
-|  +==========================+     +==========================+                  |
-|  |       FRONTEND           |     |        BACKEND           |                  |
-|  |       (Vercel)           |     |        (Render)          |                  |
-|  +==========================+     +==========================+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  |   Next.js 15       |  |     |  |   Flask Server     |  |                  |
-|  |  |   +-------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |   |  React      |  |  |     |  |   |  Routes     |  |  |                  |
-|  |  |   |  Components |  |  |     |  |   |  - /        |  |  |                  |
-|  |  |   +-------------+  |  |     |  |   |  - /health  |  |  |                  |
-|  |  |   +-------------+  |  |     |  |   |  - /clusters|  |  |                  |
-|  |  |   |  State      |  |  |     |  |   |  - /ingest  |  |  |                  |
-|  |  |   |  Management |  |  |     |  |   |  - /proxy   |  |  |                  |
-|  |  |   |  (Hooks)    |  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   |   CORS      |  |  |                  |
-|  |  |   |  API Client |  |  |     |  |   |   Middleware|  |  |                  |
-|  |  |   |  (Axios)    |  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   |  Scheduler  |  |  |                  |
-|  |  |   |  UI         |  |  |     |  |   |  (Thread)   |  |  |                  |
-|  |  |   |  (Tailwind) |  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   |  Scraper    |  |  |                  |
-|  |  |   |  Animations |  |  |     |  |   |  Pipeline   |  |  |                  |
-|  |  |   |  (Framer)   |  |  |     |  |   +-------------+  |  |                  |
-|  |  |   +-------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  +--------------------+  |     |  |   |  Database   |  |  |                  |
-|  |                          |     |  |   |  (SQLAlchemy)|  |  |                  |
-|  +==========================+     |  |   +-------------+  |  |                  |
-|              |                    |  |   +-------------+  |  |                  |
-|              | HTTP/HTTPS         |  |   |  Image      |  |  |                  |
-|              | (REST API)         |  |   |  Proxy      |  |  |                  |
-|              v                    |  |   +-------------+  |  |                  |
-|  +==========================+     |  +--------------------+  |                  |
-|  |       DATABASE           |     |                          |                  |
-|  |       (Neon)             |     |  +--------------------+  |                  |
-|  +==========================+     |  |   ML Pipeline      |  |                  |
-|  |                          |     |  |   +-------------+  |  |                  |
-|  |  +--------------------+  |     |  |   |  TF-IDF     |  |  |                  |
-|  |  |  PostgreSQL        |  |     |  |   |  Vectorizer |  |  |                  |
-|  |  |  +--------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |  |  Clusters    |  |  |     |  |   +-------------+  |  |                  |
-|  |  |  |  Table       |  |  |     |  |   |  Cosine     |  |  |                  |
-|  |  |  +--------------+  |  |     |  |   |  Similarity |  |  |                  |
-|  |  |  +--------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |  |  Articles    |  |  |     |  |   +-------------+  |  |                  |
-|  |  |  |  Table       |  |  |     |  |   |  Union-Find |  |  |                  |
-|  |  |  +--------------+  |  |     |  |   |  Clustering |  |  |                  |
-|  |  |  +--------------+  |  |     |  |   +-------------+  |  |                  |
-|  |  |  |  ScrapeRun   |  |  |     |  +--------------------+  |                  |
-|  |  |  |  Table       |  |  |     |                          |                  |
-|  |  |  +--------------+  |  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  |   External         |  |                  |
-|  |                          |     |  |   Services         |  |                  |
-|  +==========================+     |  |   +-------------+  |  |                  |
-|              ^                    |  |   |  RSS Feeds  |  |  |                  |
-|              |                    |  |   |  7 Sources  |  |  |                  |
-|              | SQLAlchemy ORM     |  |   +-------------+  |  |                  |
-|              | (Connection Pool)  |  |   +-------------+  |  |                  |
-|              |                    |  |   |  Article    |  |  |                  |
-|              +---------------------+  |   |  Pages      |  |  |                  |
-|                                       |   +-------------+  |  |                  |
-|                                       +--------------------+  |                  |
-|                                       +--------------------+  |                  |
-|                                       |   Scheduler        |  |                  |
-|                                       |   (Internal)       |  |                  |
-|                                       +--------------------+  |                  |
-|                                       +--------------------+  |                  |
-|                                       |   Image Proxy      |  |                  |
-|                                       |   (CORS Bypass)    |  |                  |
-|                                       +--------------------+  |                  |
+|  +----------------------------------------+                                     |
+|  |            FRONTEND (Vercel)           |                                     |
+|  |            Next.js 15 + React          |                                     |
+|  +------------------+---------------------+                                     |
+|                     |                                                           |
+|                     | REST API Calls                                            |
+|                     | https://news-pulse-2xcf.onrender.com                      |
+|                     v                                                           |
+|  +----------------------------------------+     +----------------------------+  |
+|  |       NODE.JS BACKEND (Render)         |     |    PYTHON SCRAPER (Render) |  |
+|  |       Fastify + PostgreSQL Pool        |     |    Flask + ML Pipeline     |  |
+|  +------------------+---------------------+     +------------+---------------+  |
+|                     |                                        |                  |
+|                     | Shared Database                        | Writes to DB     |
+|                     v                                        v                  |
+|  +----------------------------------------+     +----------------------------+  |
+|  |       DATABASE (Neon PostgreSQL)       |     |    EXTERNAL SOURCES        |  |
+|  |       Clusters, Articles, ScrapeRuns   |     |    7 RSS Feeds             |  |
+|  +----------------------------------------+     +----------------------------+  |
 |                                                                                 |
 +=================================================================================+
 
 ```
 
-### Component Breakdown
+### Service Responsibilities
 
-**1. Presentation Layer (Frontend)**
-Hosted on Vercel, the frontend is built with Next.js 15 and React. It serves as a real-time visualization dashboard. State management uses React hooks to handle live polling, data refreshing, and UI state. It is styled with Tailwind CSS using a custom glassmorphism design system, while Framer Motion drives the animations. An image proxy strategy bypasses strict CORS policies on external news images.
+**Node.js Backend (`backend/index.js`)**
 
-**2. Application & API Layer (Backend)**
-Hosted on Render, the backend operates as a Flask web server. It exposes REST API endpoints for the frontend to retrieve chronological clusters, fetch individual articles, and manually trigger scraping jobs. A background daemon thread executes the scraping pipeline autonomously every 10 minutes without blocking incoming HTTP requests.
+| Component | Responsibility |
+| --- | --- |
+| **Fastify Server** | REST API routing and request handling |
+| **CORS Middleware** | Cross-origin resource sharing configuration |
+| **PostgreSQL Pool** | Database connection management |
+| **Job Tracking** | In-memory job status storage |
+| **Image Proxy** | CORS bypass for external images |
+| **Scraper Orchestration** | Spawns Python scraper as subprocess with job ID |
 
-**3. Data Processing & Machine Learning Pipeline**
-Integrated directly into the Flask application, this pipeline is the core engine. It uses `feedparser` to pull live data, `trafilatura` to scrape the full body text, and a multi-tiered fallback for media extraction. Text data is vectorized using TF-IDF (Term Frequency-Inverse Document Frequency). A Cosine Similarity matrix is calculated to group articles meeting a 0.25 similarity threshold using a custom Union-Find algorithm.
+**Python Scraper (`scraper/main.py`)**
 
-**4. Persistence Layer (Database)**
-Hosted on Neon, the database is a managed PostgreSQL instance. Interactions are handled via SQLAlchemy, ensuring structured schemas for Clusters, Articles, and ScrapeRuns. PostgreSQL connection pooling prevents database lockups during high-volume scraping jobs.
+| Component | Responsibility |
+| --- | --- |
+| **Flask Server** | Internal API for job triggering and status |
+| **RSS Feed Fetcher** | Pulls articles from 7 news sources |
+| **Content Extractor** | Extracts full article text using trafilatura |
+| **Image Extractor** | Multi-step image detection pipeline |
+| **TF-IDF Vectorizer** | Converts text to numerical vectors |
+| **Clustering Engine** | Groups similar articles using cosine similarity |
+| **Background Scheduler** | Runs scraping autonomously every 10 minutes |
+| **SQLAlchemy ORM** | Database operations with connection pooling |
 
-## Data Flow & Processing Pipeline
+---
+
+## Data Flow
 
 ### Complete End-to-End Data Flow
 
@@ -168,57 +112,44 @@ Hosted on Neon, the database is a managed PostgreSQL instance. Interactions are 
 |                        END-TO-END DATA FLOW                                     |
 +=================================================================================+
 |                                                                                 |
-|  +------------------+                                                           |
-|  |  1. User Action  |                                                           |
-|  |  * Page Load     |                                                           |
-|  |  * Click Refresh |                                                           |
-|  |  * Filter Source |                                                           |
-|  +--------+---------+                                                           |
-|           |                                                                     |
-|           v                                                                     |
-|  +------------------+                                                           |
-|  |  2. Frontend     |                                                           |
-|  |  * API Call      |                                                           |
-|  |  * Polling       |                                                           |
-|  |  * Render UI     |                                                           |
-|  +--------+---------+                                                           |
-|           |                                                                     |
-|           | HTTP/HTTPS (REST API)                                               |
-|           v                                                                     |
-|  +------------------+     +------------------+     +------------------+         |
-|  |  3. Flask API    |---->|  4. Database     |---->|  5. Response     |         |
-|  |  * Route Handler |     |  * Query         |     |  * JSON          |         |
-|  |  * Serialize     |     |  * Transform     |     |  * Status Codes  |         |
-|  +------------------+     +------------------+     +------------------+         |
+|  USER ACTION (Page Load / Refresh Click)                                        |
+|         |                                                                       |
+|         v                                                                       |
+|  FRONTEND (Vercel)                                                              |
+|  * Makes API call to /clusters                                                  |
+|  * Renders timeline and clusters                                                |
+|  * Polls /ingest/status for job completion                                      |
+|         |                                                                       |
+|         | HTTP/HTTPS (REST API)                                                 |
+|         v                                                                       |
+|  NODE.JS BACKEND (Render)                                                       |
+|  * Receives API request                                                         |
+|  * Queries PostgreSQL for clusters                                              |
+|  * Returns JSON response to frontend                                            |
+|         |                                                                       |
+|         | ORM Query                                                             |
+|         v                                                                       |
+|  DATABASE (Neon PostgreSQL)                                                     |
+|  * Returns clusters and articles                                                |
 |                                                                                 |
-|                     +--------------------------------------------------+        |
-|                     |  6. Background Scheduler (Every 10 Minutes)      |        |
-|                     +--------------------------------------------------+        |
-|                     |                                                  |        |
-|                     v                                                  |        |
-|  +------------------+     +------------------+     +------------------+         |
-|  |  7. RSS Fetch    |---->|  8. Article      |---->|  9. Image        |         |
-|  |  * 7 Sources     |     |  Extraction      |     |  Extraction      |         |
-|  |  * Feedparser    |     |  * Trafilatura   |     |  * Multi-step    |         |
-|  +------------------+     +------------------+     +------------------+         |
-|                                      |                                          |
-|                                      v                                          |
-|  +------------------+     +------------------+     +------------------+         |
-|  | 10. Deduplicate  |---->| 11. TF-IDF       |---->| 12. Clustering   |         |
-|  |  * Check URLs    |     |  * Vectorization |     |  * Cosine Sim    |         |
-|  |  * Filter New    |     |  * Feature Matrix|     |  * Union-Find    |         |
-|  +------------------+     +------------------+     +------------------+         |
-|                                      |                                          |
-|                                      v                                          |
-|  +------------------+     +------------------+     +------------------+         |
-|  | 13. Store        |---->| 14. Update       |---->| 15. Log          |         |
-|  |  * Clusters      |     |  * ScrapeRun     |     |  * Success       |         |
-|  |  * Articles      |     |  * Status        |     |  * Error         |         |
-|  +------------------+     +------------------+     +------------------+         |
+|  BACKGROUND SCHEDULER (Every 10 Minutes)                                        |
+|         |                                                                       |
+|         v                                                                       |
+|  PYTHON SCRAPER (Render)                                                        |
+|  * Fetches RSS feeds from 7 sources                                             |
+|  * Extracts article content and images                                          |
+|  * Deduplicates against existing URLs                                           |
+|  * TF-IDF vectorization and clustering                                          |
+|  * Saves new clusters and articles to database                                  |
+|         |                                                                       |
+|         | SQLAlchemy ORM                                                        |
+|         v                                                                       |
+|  DATABASE (Neon PostgreSQL)                                                     |
+|  * Stores new clusters and articles                                             |
 |                                                                                 |
-|                     +--------------------------------------------------+        |
-|                     |  16. Frontend Update (Auto-refresh)              |        |
-|                     +--------------------------------------------------+        |
+|  FRONTEND (Auto-refresh or Manual Refresh)                                      |
+|  * Polls /clusters for updated data                                             |
+|  * Renders updated timeline                                                     |
 |                                                                                 |
 +=================================================================================+
 
@@ -226,51 +157,22 @@ Hosted on Neon, the database is a managed PostgreSQL instance. Interactions are 
 
 ### Scraping Pipeline Steps
 
-**Step 1: RSS Feed Fetching**
+1. **RSS Feed Fetching:** Queries 7 RSS feeds concurrently using a session with retry logic. Each feed returns up to 30 recent articles.
+2. **Article Content Extraction:** For each article, `trafilatura` extracts clean body text. Falls back to RSS summary if extraction fails. Minimum length validation (>100 characters).
+3. **Image Extraction (Multi-Step):**
+* RSS media tags (`media_thumbnail`, `media_content`, `enclosures`)
+* Open Graph meta tags (`og:image`)
+* Twitter Cards (`twitter:image`)
+* HTML scraping for article images
+* URL cleaning and validation
 
-* The system queries 7 RSS feeds concurrently using a session with retry logic
-* Each feed returns up to 30 recent articles
-* HTTP adapter with retry handles network failures
 
-**Step 2: Article Content Extraction**
+4. **Deduplication:** Checks existing URLs in database using set intersection for O(1) lookup. Only new articles proceed to clustering.
+5. **TF-IDF Vectorization:** Combines title and first 1000 characters of body. Removes English stop words. Limits to 1000 most important features. Creates sparse matrix representation.
+6. **Clustering with Union-Find:** Calculates cosine similarity matrix. Threshold: 0.25 (tuned for news similarity). Union-Find algorithm merges similar articles. Clusters with ≥2 articles are saved.
+7. **Storage & Logging:** Clusters and articles saved to PostgreSQL. ScrapeRun status updated. Job ID returned for async tracking.
 
-* For each article, `trafilatura` extracts clean body text
-* Fallback to RSS summary if extraction fails
-* Minimum length validation (>100 characters)
-
-**Step 3: Image Extraction (Multi-Step)**
-
-* **Step 3a:** RSS media tags (media_thumbnail, media_content, enclosures)
-* **Step 3b:** Open Graph meta tags (og:image)
-* **Step 3c:** Twitter Cards (twitter:image)
-* **Step 3d:** HTML scraping for article images
-* **Step 3e:** URL cleaning and validation
-
-**Step 4: Deduplication**
-
-* Checks existing URLs in database
-* Uses set intersection for O(1) lookup
-* Only new articles proceed to clustering
-
-**Step 5: TF-IDF Vectorization**
-
-* Combines title and first 1000 characters of body
-* Removes English stop words
-* Limits to 1000 most important features
-* Creates sparse matrix representation
-
-**Step 6: Clustering with Union-Find**
-
-* Calculates cosine similarity matrix
-* Threshold: 0.25 (tuned for news similarity)
-* Union-Find algorithm merges similar articles
-* Clusters with ≥2 articles are saved
-
-**Step 7: Storage & Logging**
-
-* Clusters and articles saved to PostgreSQL
-* ScrapeRun status updated
-* Job ID returned for async tracking
+---
 
 ## Database Schema
 
@@ -312,720 +214,123 @@ Hosted on Neon, the database is a managed PostgreSQL instance. Interactions are 
 
 ### Table Descriptions
 
-**Clusters Table**
+* **Clusters Table:** Stores groups of related articles. `label`: Headline of the most prominent article. `article_count`: Denormalized count for quick sorting. `start_time`/`end_time`: Time range of articles in cluster.
+* **Articles Table:** Stores individual news articles. `url`: Unique identifier for deduplication. `image_url`: Extracted lead image. `cluster_id`: Foreign key linking to cluster.
+* **ScrapeRun Table:** Tracks each scraping job execution. `job_id`: External identifier for polling. `status`: running, completed, failed. Stores metrics for monitoring.
 
-* Stores groups of related articles
-* `label`: Headline of the most prominent article
-* `article_count`: Denormalized count for quick sorting
-* `start_time`/`end_time`: Time range of articles in cluster
-
-**Articles Table**
-
-* Stores individual news articles
-* `url`: Unique identifier for deduplication
-* `image_url`: Extracted lead image
-* `cluster_id`: Foreign key linking to cluster
-
-**ScrapeRun Table**
-
-* Tracks each scraping job execution
-* `job_id`: External identifier for polling
-* `status`: running, completed, failed
-* Stores metrics for monitoring
+---
 
 ## Data Flow Sequence Diagrams
 
 ### Manual Scrape Trigger
 
 ```text
-Frontend                Flask API              Database              External Sources
-    |                       |                      |                        |
-    |  1. POST /ingest/trigger                    |                        |
-    |-------------------------------------------->|                        |
-    |                       |  2. Create job_id    |                        |
-    |                       |----------------------|                        |
-    |                       |  3. INSERT ScrapeRun |                        |
-    |                       |----------------------|                        |
-    |  4. Return job_id     |                      |                        |
-    |<---------------------------------------------|                        |
-    |                       |                      |                        |
-    |  5. GET /ingest/status/{job_id}             |                        |
-    |-------------------------------------------->|                        |
-    |                       |  6. Query ScrapeRun  |                        |
-    |                       |----------------------|                        |
-    |  7. Return status     |                      |                        |
-    |<---------------------------------------------|                        |
-    |                       |                      |                        |
-    |   (Background Thread) |  8. Fetch RSS Feeds  |                        |
-    |                       |--------------------------------------------->|
-    |                       |  9. Return articles  |                        |
-    |                       |<---------------------------------------------|
-    |                       |  10. Extract content |                        |
-    |                       |--------------------------------------------->|
-    |                       |  11. Return content  |                        |
-    |                       |<---------------------------------------------|
-    |                       |  12. TF-IDF + Clustering                    |
-    |                       |-------------------------------------------->|
-    |                       |  13. INSERT Clusters + Articles             |
-    |                       |-------------------------------------------->|
-    |                       |  14. UPDATE ScrapeRun                       |
-    |                       |-------------------------------------------->|
-    |  15. Status complete  |                      |                        |
-    |<---------------------------------------------|                        |
+Frontend          Node.js Backend       Python Scraper       Database         RSS Feeds
+    |                    |                    |                |                 |
+    | POST /ingest/trigger                    |                |                 |
+    |--------------------------------------->|                 |                 |
+    |                    |   Create job_id    |                |                 |
+    |                    |--------------------|                |                 |
+    |                    |   Spawn subprocess |                |                 |
+    |                    |------------------->|                |                 |
+    |                    |   Return job_id    |                |                 |
+    |                    |<-------------------|                |                 |
+    | Return job_id      |                    |                |                 |
+    |<-------------------|                    |                |                 |
+    |                    |                    |                |                 |
+    | GET /ingest/status/{job_id}             |                |                 |
+    |--------------------------------------->|                 |                 |
+    |                    |  Query ScrapeRun   |                |                 |
+    |                    |------------------------------------>|                 |
+    |                    |  Return status     |                |                 |
+    |                    |<------------------------------------|                 |
+    | Return status      |                    |                |                 |
+    |<-------------------|                    |                |                 |
+    |                    |                    |                |                 |
+    |   (Background)     |                    | Fetch RSS Feeds|                 |
+    |                    |                    |--------------------------------->|
+    |                    |                    | Return articles|                 |
+    |                    |                    |<---------------------------------|
+    |                    |                    | Extract content|                 |
+    |                    |                    |--------------------------------->|
+    |                    |                    | Return content |                 |
+    |                    |                    |<---------------------------------|
+    |                    |                    | TF-IDF + Clustering              |
+    |                    |                    |--------------------------------->|
+    |                    |                    | Save to DB     |                 |
+    |                    |                    |--------------------------------->|
+    |                    |                    | UPDATE ScrapeRun                 |
+    |                    |                    |--------------------------------->|
+    | Status complete    |                    |                |                 |
+    |<-------------------|                    |                |                 |
 
 ```
 
 ### Automatic Scheduler Flow
 
 ```text
-    Scheduler              Flask API              Database              External Sources
-    (Thread)                   |                      |                        |
-        |                      |                      |                        |
-        |  1. Sleep 600s       |                      |                        |
-        |----------------------|                      |                        |
-        |                      |                      |                        |
-        |  2. Wake up          |                      |                        |
-        |----------------------|                      |                        |
-        |  3. Call fetch_articles()                   |                        |
-        |----------------------|                      |                        |
-        |                      |  4. Fetch RSS Feeds  |                        |
-        |                      |--------------------------------------------->|
-        |                      |  5. Return articles  |                        |
-        |                      |<---------------------------------------------|
-        |                      |  6. Extract content  |                        |
-        |                      |--------------------------------------------->|
-        |                      |  7. Return content  |                        |
-        |                      |<---------------------------------------------|
-        |                      |  8. Extract images   |                        |
-        |                      |--------------------------------------------->|
-        |                      |  9. Return images    |                        |
-        |                      |<---------------------------------------------|
-        |                      |  10. Deduplicate      |                        |
-        |                      |-------------------------------------------->|
-        |                      |  11. Existing URLs   |                        |
-        |                      |<--------------------------------------------|
-        |                      |  12. TF-IDF + Clustering                    |
-        |                      |-------------------------------------------->|
-        |                      |  13. Save to DB      |                        |
-        |                      |-------------------------------------------->|
-        |                      |  14. Log complete    |                        |
-        |                      |-------------------------------------------->|
-        |  15. Repeat          |                      |                        |
-        |----------------------|                      |                        |
+  Scheduler         Python Scraper          Database         RSS Feeds
+   (Thread)              |                     |                |
+      |                  |                     |                |
+      | Sleep 600s       |                     |                |
+      |----------------->|                     |                |
+      |                  |                     |                |
+      | Wake up          |                     |                |
+      |----------------->|                     |                |
+      |                  | Fetch RSS Feeds     |                |
+      |                  |------------------------------------->|
+      |                  | Return articles     |                |
+      |                  |<-------------------------------------|
+      |                  | Extract content     |                |
+      |                  |------------------------------------->|
+      |                  | Return content      |                |
+      |                  |<-------------------------------------|
+      |                  | Extract images      |                |
+      |                  |------------------------------------->|
+      |                  | Return images       |                |
+      |                  |<-------------------------------------|
+      |                  | Deduplicate         |                |
+      |                  |------------------------------------->|
+      |                  | Existing URLs       |                |
+      |                  |<-------------------------------------|
+      |                  | TF-IDF + Clustering |                |
+      |                  |------------------------------------->|
+      |                  | Save to DB          |                |
+      |                  |------------------------------------->|
+      |                  | Log complete        |                |
+      |                  |------------------------------------->|
+      | Repeat           |                     |                |
+      |----------------->|                     |                |
 
 ```
 
-## Deployment Architecture
-
-### Cloud Infrastructure
-
-```text
-+=================================================================================+
-|                           DEPLOYMENT ARCHITECTURE                               |
-+=================================================================================+
-|                                                                                 |
-|  +============================+     +============================+              |
-|  |         VERCEL             |     |         RENDER             |              |
-|  |      (Frontend)            |     |      (Backend)             |              |
-|  +============================+     +============================+              |
-|  |                            |     |                            |              |
-|  |  +----------------------+  |     |  +----------------------+  |              |
-|  |  |  Next.js 15          |  |     |  |  Flask API           |  |              |
-|  |  |  * SSR/SSG           |  |     |  |  * Python 3.13.5     |  |              |
-|  |  |  * Static Export     |  |     |  |  * Gunicorn          |  |              |
-|  |  |  * ISR               |  |     |  |  * Connection Pool   |  |              |
-|  |  +----------------------+  |     |  +----------------------+  |              |
-|  |                            |     |  +----------------------+  |              |
-|  |  +----------------------+  |     |  |  Scraper Engine      |  |              |
-|  |  |  Environment         |  |     |  |  * RSS Feeds         |  |              |
-|  |  |  * NEXT_PUBLIC_API   |  |     |  |  * TF-IDF            |  |              |
-|  |  +----------------------+  |     |  |  * Clustering        |  |              |
-|  |                            |     |  +----------------------+  |              |
-|  |  +----------------------+  |     |  +----------------------+  |              |
-|  |  |  Custom Domain       |  |     |  |  Scheduler           |  |              |
-|  |  |  * Vercel Subdomain  |  |     |  |  * Daemon Thread     |  |              |
-|  |  +----------------------+  |     |  |  * Every 10 minutes  |  |              |
-|  |                            |     |  +----------------------+  |              |
-|  +============================+     +============================+              |
-|              |                                     |                            |
-|              | HTTP/HTTPS                          | SQLAlchemy ORM             |
-|              |                                     |                            |
-|              v                                     v                            |
-|  +============================+     +============================+              |
-|  |           NEON             |     |         CRON-JOB.ORG       |              |
-|  |       (Database)           |     |      (Keep-alive)          |              |
-|  +============================+     +============================+              |
-|  |                            |     |                            |              |
-|  |  +----------------------+  |     |  +----------------------+  |              |
-|  |  |  PostgreSQL 16       |  |     |  |  Scheduled Job       |  |              |
-|  |  |  * Connection Pool   |  |     |  |  * Every 5 minutes   |  |              |
-|  |  |  * SSL Encryption    |  |     |  |  * Ping /health      |  |              |
-|  |  |  * Automatic Backup  |  |     |  |  * Prevent sleep     |  |              |
-|  |  +----------------------+  |     |  +----------------------+  |              |
-|  |                            |     |                            |              |
-|  |  +----------------------+  |     +============================+              |
-|  |  |  Free Tier Limits    |  |                                                 |
-|  |  |  * 1 GB Storage      |  |                                                 |
-|  |  |  * 30 Day Retention  |  |                                                 |
-|  |  +----------------------+  |                                                 |
-|  +============================+                                                 |
-|                                                                                 |
-+=================================================================================+
-
-```
-
-### Deployment Configuration
-
-**Render Configuration**
-
-| Setting | Value |
-| --- | --- |
-| **Environment** | Python 3 |
-| **Root Directory** | scraper |
-| **Build Command** | `pip install -r requirements.txt` |
-| **Start Command** | `python3 main.py` |
-| **Instance Type** | Free |
-| **Port** | 10000 |
-
-**Vercel Configuration**
-
-| Setting | Value |
-| --- | --- |
-| **Framework** | Next.js |
-| **Build Command** | `npm run build` |
-| **Output Directory** | `.next` |
-| **Install Command** | `npm install` |
-| **Environment Variable** | `NEXT_PUBLIC_API_URL` |
-
-**Neon Configuration**
-
-| Setting | Value |
-| --- | --- |
-| **Plan** | Free Tier |
-| **Storage** | 1 GB |
-| **Connections** | 5 max concurrent |
-| **SSL** | Required |
-| **Backups** | Automatic (30 days) |
-
-## API Architecture
-
-### Request-Response Flow
-
-```text
-+=================================================================================+
-|                        REQUEST-RESPONSE FLOW                                    |
-+=================================================================================+
-|                                                                                 |
-|  +------------------+                                                           |
-|  |  Client Request  |                                                           |
-|  |  * Next.js Front |                                                           |
-|  |  * Axios Client  |                                                           |
-|  +--------+---------+                                                           |
-|           |                                                                     |
-|           | HTTP Request                                                        |
-|           | * Method: GET/POST                                                  |
-|           | * Headers: Accept, CORS                                             |
-|           | * Body: JSON (for POST)                                             |
-|           v                                                                     |
-|  +------------------+     +------------------+     +------------------+         |
-|  |  Flask Router    |---->|  CORS Middleware |---->|  Route Handler   |         |
-|  |  * URL Routing   |     |  * Origin Check  |     |  * Business Logic|         |
-|  +------------------+     +------------------+     +------------------+         |
-|                                                                |                |
-|                                                                v                |
-|  +------------------+     +------------------+     +------------------+         |
-|  |  Serialization   |<----|  Database Query  |<----|  Model Objects   |         |
-|  |  * JSON Response |     |  * SQLAlchemy    |     |  * SQLAlchemy    |         |
-|  |  * Status Code   |     |  * Connection    |     |  * ORM           |         |
-|  +------------------+     +------------------+     +------------------+         |
-|           |                                                                     |
-|           | HTTP Response                                                       |
-|           | * Status: 200/404/500                                               |
-|           | * Body: JSON                                                        |
-|           | * Headers: Content-Type, CORS                                       |
-|           v                                                                     |
-|  +------------------+                                                           |
-|  |  Client Response |                                                           |
-|  |  * React Render  |                                                           |
-|  |  * UI Update     |                                                           |
-|  +------------------+                                                           |
-|                                                                                 |
-+=================================================================================+
-
-```
-
-### API Endpoint Details
-
-**1. GET /clusters**
-
-```text
-+--------------------------------------------------+
-|  GET /clusters                                   |
-+--------------------------------------------------+
-|  Purpose: Retrieve all clusters with articles    |
-|  Response Time: < 500ms                          |
-|  Authentication: None                            |
-+--------------------------------------------------+
-|  Request:                                        |
-|  * No parameters required                        |
-|                                                  |
-|  Response:                                       |
-|  {                                               |
-|    "success": true,                              |
-|    "clusters": [                                 |
-|      {                                           |
-|        "id": "uuid",                             |
-|        "label": "Headline",                      |
-|        "article_count": 4,                       |
-|        "start_time": "ISO-8601",                 |
-|        "end_time": "ISO-8601",                   |
-|        "articles": [                             |
-|          {                                       |
-|            "id": "uuid",                         |
-|            "title": "Article title",             |
-|            "url": "https://...",                 |
-|            "summary": "Brief summary",           |
-|            "image_url": "https://...",           |
-|            "source": "BBC News",                 |
-|            "published_at": "ISO-8601"            |
-|          }                                       |
-|        ]                                         |
-|      }                                           |
-|    ],                                            |
-|    "sources": [                                  |
-|      {"source": "BBC News", "count": 12}         |
-|    ]                                             |
-|  }                                               |
-+--------------------------------------------------+
-
-```
-
-**2. POST /ingest/trigger**
-
-```text
-+--------------------------------------------------+
-|  POST /ingest/trigger                            |
-+--------------------------------------------------+
-|  Purpose: Start a new scraping job asynchronously|
-|  Response Time: < 100ms                          |
-|  Authentication: None                            |
-+--------------------------------------------------+
-|  Request:                                        |
-|  * Empty body (or optional job_id)               |
-|                                                  |
-|  Response:                                       |
-|  {                                               |
-|    "success": true,                              |
-|    "job_id": "uuid"                              |
-|  }                                               |
-|                                                  |
-|  Background Process:                             |
-|  1. Fetch articles from 7 sources                |
-|  2. Extract content and images                   |
-|  3. Cluster using TF-IDF + Cosine Similarity     |
-|  4. Save to database                             |
-|  5. Update job status in ScrapeRun table         |
-+--------------------------------------------------+
-
-```
-
-**3. GET /ingest/status/{job_id}**
-
-```text
-+--------------------------------------------------+
-|  GET /ingest/status/{job_id}                     |
-+--------------------------------------------------+
-|  Purpose: Check job status and results           |
-|  Response Time: < 100ms                          |
-|  Authentication: None                            |
-+--------------------------------------------------+
-|  Request:                                        |
-|  * URL parameter: job_id (UUID)                  |
-|                                                  |
-|  Response:                                       |
-|  {                                               |
-|    "status": "running|completed|failed",         |
-|    "articles_found": 150,                        |
-|    "articles_new": 65,                           |
-|    "clusters_created": 1,                        |
-|    "error_message": null                         |
-|  }                                               |
-+--------------------------------------------------+
-
-```
-
-**4. GET /health**
-
-```text
-+--------------------------------------------------+
-|  GET /health                                     |
-+--------------------------------------------------+
-|  Purpose: Health check for monitoring            |
-|  Response Time: < 50ms                           |
-|  Authentication: None                            |
-+--------------------------------------------------+
-|  Response:                                       |
-|  {                                               |
-|    "status": "healthy",                          |
-|    "timestamp": "ISO-8601"                       |
-|  }                                               |
-|                                                  |
-|  Usage:                                          |
-|  * Used by cron-job.org for keep-alive           |
-|  * Render health check                           |
-+--------------------------------------------------+
-
-```
-
-## External Service Integration
-
-### News Source Connections
-
-```text
-+=================================================================================+
-|                        EXTERNAL SERVICE CONNECTIONS                             |
-+=================================================================================+
-|                                                                                 |
-|  +--------------------------+     +--------------------------+                  |
-|  |      RSS FEEDS           |     |      ARTICLE PAGES       |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | BBC News           |  |     |  | BBC News           |  |                  |
-|  |  | feeds.bbci.co.uk   |  |     |  | [bbc.com/news](https://bbc.com/news)       |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Al Jazeera         |  |     |  | Al Jazeera         |  |                  |
-|  |  | [aljazeera.com/xml](https://aljazeera.com/xml)  |  |     |  | aljazeera.com      |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | CNN                |  |     |  | CNN                |  |                  |
-|  |  | rss.cnn.com        |  |     |  | cnn.com            |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Fox News           |  |     |  | Fox News           |  |                  |
-|  |  | feeds.foxnews.com  |  |     |  | foxnews.com        |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | NBC News           |  |     |  | NBC News           |  |                  |
-|  |  | feeds.nbcnews.com  |  |     |  | nbcnews.com        |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Sky News           |  |     |  | Sky News           |  |                  |
-|  |  | [skynews.com/feeds](https://skynews.com/feeds)  |  |     |  | news.sky.com       |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |                          |     |                          |                  |
-|  +--------------------------+     +--------------------------+                  |
-|           |                                      |                              |
-|           | HTTP GET                             | HTTP GET                     |
-|           | * User-Agent: Mozilla                | * User-Agent: Mozilla        |
-|           | * Timeout: 10s                       | * Timeout: 8s                |
-|           | * Retry: 2x                          | * Retry: 2x                  |
-|           v                                      v                              |
-|  +--------------------------+     +--------------------------+                  |
-|  |      RESPONSE            |     |      RESPONSE            |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | RSS XML Feed       |  |     |  | HTML Page          |  |                  |
-|  |  | * Entries          |  |     |  | * Open Graph       |  |                  |
-|  |  | * Metadata         |  |     |  | * Twitter Cards    |  |                  |
-|  |  | * Media Tags       |  |     |  | * Article Content  |  |                  |
-|  |  +--------------------+  |     |  | * Images           |  |                  |
-|  |                          |     |  +--------------------+  |                  |
-|  +--------------------------+     +--------------------------+                  |
-|                                                                                 |
-+=================================================================================+
-
-```
-
-### Database Connection
-
-```text
-+=================================================================================+
-|                        DATABASE CONNECTION FLOW                                 |
-+=================================================================================+
-|                                                                                 |
-|  +--------------------------+     +--------------------------+                  |
-|  |      FLASK APP           |     |      NEON POSTGRESQL     |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Connection Pool    |  |     |  | Connection Pool    |  |                  |
-|  |  | * pool_size: 5     |  |     |  | * max: 5           |  |                  |
-|  |  | * max_overflow: 10 |  |     |  | * idle_timeout: 30 |  |                  |
-|  |  | * pool_recycle: 300|  |     |  | * ssl: require     |  |                  |
-|  |  | * pool_pre_ping: T |  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  | Database Instance  |  |                  |
-|  |  | SQLAlchemy ORM     |  |     |  | * Version: 16      |  |                  |
-|  |  | * Session Manager  |  |     |  | * Region: AWS      |  |                  |
-|  |  | * Model Mappings   |  |     |  | * Backup: Daily    |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Operations         |  |     |  | Tables             |  |                  |
-|  |  | * INSERT           |  |     |  | * clusters         |  |                  |
-|  |  | * SELECT           |  |     |  | * articles         |  |                  |
-|  |  | * UPDATE           |  |     |  | * scrape_runs      |  |                  |
-|  |  | * DELETE           |  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |                          |                  |
-|  |                          |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  | Connection String  |  |                  |
-|  |  | Error Handling     |  |     |  | * sslmode=require  |  |                  |
-|  |  | * SSL Errors       |  |     |  | * host: neon.tech  |  |                  |
-|  |  | * Timeout Retry    |  |     |  +--------------------+  |                  |
-|  |  | * Connection Reset |  |     |                          |                  |
-|  |  +--------------------+  |     |                          |                  |
-|  |                          |     |                          |                  |
-|  +--------------------------+     +--------------------------+                  |
-|           |                                      |                              |
-|           | SQLAlchemy ORM                       | TCP/SSL                      |
-|           | * Autocommit: False                  | * Port: 5432                 |
-|           | * Autoflush: True                    | * Cipher: TLS 1.2+           |
-|           | * Expire_on_commit: True             | * Timeout: 30s               |
-|           v                                      v                              |
-|  +--------------------------+     +--------------------------+                  |
-|  |      RESPONSE            |     |      RESPONSE            |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Query Results      |  |     |  | Query Results      |  |                  |
-|  |  | * Clusters         |  |     |  | * Clusters         |  |                  |
-|  |  | * Articles         |  |     |  | * Articles         |  |                  |
-|  |  | * ScrapeRun        |  |     |  | * ScrapeRun        |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |                          |     |                          |                  |
-|  +--------------------------+     +--------------------------+                  |
-|                                                                                 |
-+=================================================================================+
-
-```
-
-## Security Architecture
-
-```text
-+=================================================================================+
-|                          SECURITY ARCHITECTURE                                  |
-+=================================================================================+
-|                                                                                 |
-|  +--------------------------+     +--------------------------+                  |
-|  |      LAYER 1:            |     |      LAYER 2:            |                  |
-|  |      FRONTEND            |     |      NETWORK             |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | HTTPS Only         |  |     |  | SSL/TLS 1.2+       |  |                  |
-|  |  | * Vercel enforces  |  |     |  | * Render enforces  |  |                  |
-|  |  | * HSTS Header      |  |     |  | * Certificate      |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | CSP Headers        |  |     |  | CORS Restricted    |  |                  |
-|  |  | * Restricted CDN   |  |     |  | * Vercel domains   |  |                  |
-|  |  | * No eval()        |  |     |  | * Localhost dev    |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  +--------------------------+     +--------------------------+                  |
-|                                                                                 |
-|  +--------------------------+     +--------------------------+                  |
-|  |      LAYER 3:            |     |      LAYER 4:            |                  |
-|  |      APPLICATION         |     |      DATABASE            |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Environment Vars   |  |     |  | SSL Required       |  |                  |
-|  |  | * DATABASE_URL     |  |     |  | * sslmode=require  |  |                  |
-|  |  | * API Keys         |  |     |  | * No plaintext     |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Input Validation   |  |     |  | Connection Pool    |  |                  |
-|  |  | * URL Validation   |  |     |  | * Limit: 5         |  |                  |
-|  |  | * Data Sanitization|  |     |  | * Overflow: 10     |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Error Handling     |  |     |  | Prepared Statements|  |                  |
-|  |  | * No stack traces  |  |     |  | * SQLAlchemy ORM   |  |                  |
-|  |  | * Generic messages |  |     |  | * No SQL injection |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  +--------------------------+     +--------------------------+                  |
-|                                                                                 |
-|  +--------------------------+     +--------------------------+                  |
-|  |      LAYER 5:            |     |      LAYER 6:            |                  |
-|  |      MONITORING          |     |      BACKUP              |                  |
-|  +--------------------------+     +--------------------------+                  |
-|  |                          |     |                          |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Health Checks      |  |     |  | Automatic Backups  |  |                  |
-|  |  | * /health          |  |     |  | * Daily snapshots  |  |                  |
-|  |  | * 200 OK required  |  |     |  | * Point-in-time    |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  |  | Logging            |  |     |  | Retention Period   |  |                  |
-|  |  | * Request logging  |  |     |  | * 30 days          |  |                  |
-|  |  | * Error logging    |  |     |  | * Free tier        |  |                  |
-|  |  +--------------------+  |     |  +--------------------+  |                  |
-|  +--------------------------+     +--------------------------+                  |
-|                                                                                 |
-+=================================================================================+
-
-```
-
-## Tech Stack
-
-### Backend
-
-| Technology | Version | Purpose |
-| --- | --- | --- |
-| **Python** | 3.13.5 | Core language |
-| **Flask** | 3.1.3 | Web framework and API server |
-| **Flask-CORS** | 4.0.0 | Cross-origin resource sharing |
-| **SQLAlchemy** | 2.0.51 | ORM for database operations |
-| **Scikit-learn** | 1.9.0 | TF-IDF vectorization and clustering |
-| **Feedparser** | 6.0.12 | RSS feed parsing |
-| **Trafilatura** | 2.1.0 | Article text extraction |
-| **BeautifulSoup** | 4.15.0 | HTML parsing and image extraction |
-| **Psycopg2** | 2.9.12 | PostgreSQL adapter |
-| **Requests** | 2.34.2 | HTTP client with retry logic |
-| **Numpy** | 1.26.4 | Numerical computing |
-| **Scipy** | 1.17.1 | Scientific computing |
-
-### Frontend
-
-| Technology | Version | Purpose |
-| --- | --- | --- |
-| **Next.js** | 15.x | React framework |
-| **React** | 19.x | UI library |
-| **Tailwind CSS** | 4.x | Utility-first CSS |
-| **Framer Motion** | 12.x | Animations |
-| **Axios** | 1.x | HTTP client |
-| **date-fns** | 4.x | Date formatting |
-
-### Database & Deployment
-
-| Technology | Version | Purpose |
-| --- | --- | --- |
-| **Neon PostgreSQL** | 16.x | Managed database |
-| **Render** |  | Backend hosting |
-| **Vercel** |  | Frontend hosting |
-| **cron-job.org** |  | Keep-alive service |
-
-## Project Structure
-
-```text
-news--pulse/
-├── frontend/                    # Next.js 15 Frontend
-│   ├── app/
-│   │   ├── page.js             # Main dashboard component
-│   │   ├── layout.js           # Root layout with metadata
-│   │   └── globals.css         # Global styles
-│   ├── package.json            # Frontend dependencies
-│   ├── tailwind.config.js      # Tailwind CSS configuration
-│   └── .env.local              # Local environment variables
-├── scraper/                     # Python Backend + Scraper
-│   └── main.py                 # Flask API + integrated scraper
-├── backend/                     # Node.js Backend (NOT USED - kept for reference)
-│   └── index.js                # Fastify API (not deployed)
-├── requirements.txt             # Python dependencies
-├── .python-version             # Python 3.13.5 specification
-├── run.sh                      # Startup script
-├── .env                        # Environment variables
-└── .gitignore                  # Git ignore patterns
-
-```
-
-## Setup and Installation
-
-### Prerequisites
-
-* Python 3.13+
-* Node.js 18+
-* PostgreSQL (or a Neon account)
-* Git
-
-### 1. Clone the Repository
-
-```bash
-git clone [https://github.com/MrMan003/news--pulse.git](https://github.com/MrMan003/news--pulse.git)
-cd news--pulse
-
-```
-
-### 2. Backend Setup
-
-```bash
-# Navigate to the scraper directory
-cd scraper
-
-# Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r ../requirements.txt
-
-```
-
-### 3. Environment Variables
-
-Create a `.env` file in the root directory and add your configurations:
-
-```env
-DATABASE_URL=postgresql://username:password@host/database?sslmode=require
-PYTHON_PATH=/usr/bin/python3
-SCRAPER_PATH=./scraper
-PORT=10000
-CORS_ORIGIN=*
-NODE_ENV=production
-
-```
-
-### 4. Frontend Setup
-
-```bash
-# Navigate to the frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Configure local environment variables
-echo "NEXT_PUBLIC_API_URL=[https://news-pulse-1.onrender.com](https://news-pulse-1.onrender.com)" > .env.local
-
-```
-
-> **Note:** If deploying to Vercel, add `NEXT_PUBLIC_API_URL=https://news-pulse-1.onrender.com` to your project's Environment Variables in the Vercel dashboard.
-
-### 5. Run Locally
-
-To run the full stack locally, start both servers in separate terminal windows:
-
-**Terminal 1 (Backend):**
-
-```bash
-cd scraper
-python3 main.py
-
-```
-
-**Terminal 2 (Frontend):**
-
-```bash
-cd frontend
-npm run dev
-
-```
-
-Open `http://localhost:3000` in your browser to view the application.
+---
 
 ## API Endpoints
+
+### Node.js Backend ([https://news-pulse-2xcf.onrender.com](https://news-pulse-2xcf.onrender.com))
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
 | `/` | `GET` | Service health and available endpoints |
 | `/health` | `GET` | Detailed health check with timestamp |
-| `/clusters` | `GET` | Retrieve all clusters with their associated articles and source counts |
+| `/clusters` | `GET` | Retrieve all clusters with articles and source counts |
+| `/clusters/:id` | `GET` | Retrieve a single cluster with all its articles |
+| `/timeline` | `GET` | Clusters formatted for timeline visualization |
+| `/ingest/trigger` | `POST` | Start a new scraping job asynchronously |
+| `/ingest/status/:jobId` | `GET` | Check job status and results |
+| `/proxy-image` | `GET` | Proxy external images to bypass CORS policies |
+
+### Python Scraper ([https://news-pulse-1.onrender.com](https://news-pulse-1.onrender.com))
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/` | `GET` | Service health and available endpoints |
+| `/health` | `GET` | Detailed health check with timestamp |
+| `/clusters` | `GET` | Retrieve all clusters with articles and source counts |
 | `/ingest/trigger` | `POST` | Start a new scraping job asynchronously |
 | `/ingest/status/<job_id>` | `GET` | Check job status and results |
-| `/proxy-image` | `GET` | Proxy external images to bypass strict CORS policies |
+| `/proxy-image` | `GET` | Proxy external images to bypass CORS policies |
 
 ### Example Response: `/clusters`
 
@@ -1060,6 +365,273 @@ Open `http://localhost:3000` in your browser to view the application.
 
 ```
 
+---
+
+## Deployment Architecture
+
+### Cloud Infrastructure
+
+```text
++=================================================================================+
+|                           DEPLOYMENT ARCHITECTURE                               |
++=================================================================================+
+|                                                                                 |
+|  +============================+     +============================+              |
+|  |         VERCEL             |     |         RENDER             |              |
+|  |      (Frontend)            |     |      (Backend)             |              |
+|  +============================+     +============================+              |
+|  |                            |     |                            |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |  |  Next.js 15          |  |     |  |  Node.js + Fastify   |  |              |
+|  |  |  * SSR/SSG           |  |     |  |  * Port: 10000       |  |              |
+|  |  |  * Static Export     |  |     |  |  * CORS enabled      |  |              |
+|  |  |  * ISR               |  |     |  |  * Job tracking      |  |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |                            |     |                            |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |  |  Environment         |  |     |  |  Python + Flask      |  |              |
+|  |  |  * NEXT_PUBLIC_API   |  |     |  |  * Port: 10000       |  |              |
+|  |  +----------------------+  |     |  |  * ML Pipeline       |  |              |
+|  |                            |     |  |  * Scheduler         |  |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |  |  URL:                |  |     |                            |              |
+|  |  |  news-pulse-tvh9     |  |     |  +----------------------+  |              |
+|  |  +----------------------+  |     |  |  URL:                |  |              |
+|  |                            |     |  |  news-pulse-2xcf     |  |              |
+|  +============================+     |  +----------------------+  |              |
+|              |                      +============================+              |
+|              |                                     |                            |
+|              | HTTP/HTTPS                          | SQLAlchemy ORM             |
+|              |                                     |                            |
+|              v                                     v                            |
+|  +============================+     +============================+              |
+|  |           NEON             |     |         CRON-JOB.ORG       |              |
+|  |       (Database)           |     |      (Keep-alive)          |              |
+|  +============================+     +============================+              |
+|  |                            |     |                            |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |  |  PostgreSQL 16       |  |     |  |  Scheduled Job       |  |              |
+|  |  |  * Connection Pool   |  |     |  |  * Every 5 minutes   |  |              |
+|  |  |  * SSL Encryption    |  |     |  |  * Ping /health      |  |              |
+|  |  |  * Automatic Backup  |  |     |  |  * Prevent sleep     |  |              |
+|  |  +----------------------+  |     |  +----------------------+  |              |
+|  |                            |     |                            |              |
+|  |  +----------------------+  |     +============================+              |
+|  |  |  Free Tier Limits    |  |                                                 |
+|  |  |  * 1 GB Storage      |  |                                                 |
+|  |  |  * 30 Day Retention  |  |                                                 |
+|  |  +----------------------+  |                                                 |
+|  +============================+                                                 |
+|                                                                                 |
++=================================================================================+
+
+```
+
+### Deployment Configuration
+
+**Node.js Backend (Render)**
+
+| Setting | Value |
+| --- | --- |
+| **Environment** | Node.js |
+| **Root Directory** | backend |
+| **Build Command** | `npm install` |
+| **Start Command** | `node index.js` |
+| **Instance Type** | Free |
+| **Port** | 10000 |
+| **URL** | `https://news-pulse-2xcf.onrender.com` |
+
+**Python Scraper (Render)**
+
+| Setting | Value |
+| --- | --- |
+| **Environment** | Python 3 |
+| **Root Directory** | scraper |
+| **Build Command** | `pip install -r requirements.txt` |
+| **Start Command** | `python3 main.py` |
+| **Instance Type** | Free |
+| **Port** | 10000 |
+| **URL** | `https://news-pulse-1.onrender.com` |
+
+**Frontend (Vercel)**
+
+| Setting | Value |
+| --- | --- |
+| **Framework** | Next.js |
+| **Build Command** | `npm run build` |
+| **Output Directory** | `.next` |
+| **Install Command** | `npm install` |
+| **Environment Variable** | `NEXT_PUBLIC_API_URL=https://news-pulse-2xcf.onrender.com` |
+| **URL** | `https://news-pulse-tvh9.vercel.app` |
+
+**Database (Neon)**
+
+| Setting | Value |
+| --- | --- |
+| **Plan** | Free Tier |
+| **Storage** | 1 GB |
+| **Connections** | 5 max concurrent |
+| **SSL** | Required |
+| **Backups** | Automatic (30 days) |
+
+---
+
+## Project Structure
+
+```text
+news--pulse/
+├── frontend/                    # Next.js 15 Frontend
+│   ├── app/
+│   │   ├── page.js             # Main dashboard component
+│   │   ├── layout.js           # Root layout with metadata
+│   │   └── globals.css         # Global styles
+│   ├── package.json            # Frontend dependencies
+│   ├── tailwind.config.js      # Tailwind CSS configuration
+│   └── .env.local              # Local environment variables
+├── backend/                     # Node.js Backend (DEPLOYED)
+│   └── index.js                # Fastify API with job management
+├── scraper/                     # Python Backend + Scraper
+│   └── main.py                 # Flask API + integrated scraper
+├── requirements.txt             # Python dependencies
+├── .python-version             # Python 3.13.5 specification
+├── run.sh                      # Startup script
+├── .env                        # Environment variables
+└── .gitignore                  # Git ignore patterns
+
+```
+
+---
+
+## Tech Stack
+
+### Backend (Node.js)
+
+| Technology | Version | Purpose |
+| --- | --- | --- |
+| **Node.js** | 18+ | JavaScript runtime |
+| **Fastify** | 4.x | Web framework and API server |
+| **@fastify/cors** | 8.x | Cross-origin resource sharing |
+| **pg** | 8.x | PostgreSQL driver |
+| **zod** | 3.x | Schema validation |
+| **nanoid** | 5.x | Unique ID generation |
+
+### Backend (Python)
+
+| Technology | Version | Purpose |
+| --- | --- | --- |
+| **Python** | 3.13.5 | Core language |
+| **Flask** | 3.1.3 | Web framework and API server |
+| **Flask-CORS** | 4.0.0 | Cross-origin resource sharing |
+| **SQLAlchemy** | 2.0.51 | ORM for database operations |
+| **Scikit-learn** | 1.9.0 | TF-IDF vectorization and clustering |
+| **Feedparser** | 6.0.12 | RSS feed parsing |
+| **Trafilatura** | 2.1.0 | Article text extraction |
+| **BeautifulSoup** | 4.15.0 | HTML parsing and image extraction |
+| **Psycopg2** | 2.9.12 | PostgreSQL adapter |
+
+### Frontend
+
+| Technology | Version | Purpose |
+| --- | --- | --- |
+| **Next.js** | 15.x | React framework |
+| **React** | 19.x | UI library |
+| **Tailwind CSS** | 4.x | Utility-first CSS |
+| **Framer Motion** | 12.x | Animations |
+| **Axios** | 1.x | HTTP client |
+| **date-fns** | 4.x | Date formatting |
+
+---
+
+## Setup and Installation
+
+### Prerequisites
+
+* Python 3.13+
+* Node.js 18+
+* PostgreSQL (or a Neon account)
+* Git
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/MrMan003/news--pulse.git
+cd news--pulse
+
+```
+
+### 2. Backend (Node.js) Setup
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Install dependencies
+npm install
+
+# Create .env file
+echo "DATABASE_URL=postgresql://username:password@host/database?sslmode=require" > .env
+
+```
+
+### 3. Backend (Python) Setup
+
+```bash
+# Navigate to the scraper directory
+cd scraper
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r ../requirements.txt
+
+```
+
+### 4. Frontend Setup
+
+```bash
+# Navigate to the frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Configure local environment variables
+echo "NEXT_PUBLIC_API_URL=http://localhost:10000" > .env.local
+
+```
+
+### 5. Run Locally
+
+**Terminal 1 (Node.js Backend):**
+
+```bash
+cd backend
+node index.js
+
+```
+
+**Terminal 2 (Python Scraper):**
+
+```bash
+cd scraper
+python3 main.py
+
+```
+
+**Terminal 3 (Frontend):**
+
+```bash
+cd frontend
+npm run dev
+
+```
+
+Open `http://localhost:3000` in your browser to view the application.
+
+---
+
 ## How Clustering Works
 
 1. **TF-IDF Vectorization:** Converts raw article text into numerical vectors.
@@ -1090,17 +662,21 @@ Final: [1,2,3] → Cluster
 
 
 
+---
+
 ## News Sources
 
 | Source | Feed URL |
 | --- | --- |
-| **BBC News** | http://feeds.bbci.co.uk/news/rss.xml |
-| **BBC World** | http://feeds.bbci.co.uk/news/world/rss.xml |
-| **Al Jazeera** | https://www.aljazeera.com/xml/rss/all.xml |
-| **Sky News** | https://feeds.skynews.com/feeds/rss/world.xml |
-| **CNN** | http://rss.cnn.com/rss/cnn_topstories.rss |
-| **Fox News** | http://feeds.foxnews.com/foxnews/politics |
-| **NBC News** | https://feeds.nbcnews.com/nbcnews/public/news |
+| **BBC News** | [http://feeds.bbci.co.uk/news/rss.xml](http://feeds.bbci.co.uk/news/rss.xml) |
+| **BBC World** | [http://feeds.bbci.co.uk/news/world/rss.xml](http://feeds.bbci.co.uk/news/world/rss.xml) |
+| **Al Jazeera** | [https://www.aljazeera.com/xml/rss/all.xml](https://www.aljazeera.com/xml/rss/all.xml) |
+| **Sky News** | [https://feeds.skynews.com/feeds/rss/world.xml](https://feeds.skynews.com/feeds/rss/world.xml) |
+| **CNN** | [http://rss.cnn.com/rss/cnn_topstories.rss](http://rss.cnn.com/rss/cnn_topstories.rss) |
+| **Fox News** | [http://feeds.foxnews.com/foxnews/politics](http://feeds.foxnews.com/foxnews/politics) |
+| **NBC News** | [https://feeds.nbcnews.com/nbcnews/public/news](https://feeds.nbcnews.com/nbcnews/public/news) |
+
+---
 
 ## Security & Performance
 
@@ -1125,6 +701,8 @@ Final: [1,2,3] → Cluster
 | **Database Connections** | 5 (pool) + 10 (overflow) |
 | **Memory Usage** | ~200MB |
 | **CPU Usage** | ~5-10% during scrape |
+
+---
 
 ## Troubleshooting
 
@@ -1151,22 +729,13 @@ ModuleNotFoundError: No module named 'sklearn'
 **3. CORS Errors**
 
 ```text
-Access to fetch at '[https://news-pulse-1.onrender.com/clusters](https://news-pulse-1.onrender.com/clusters)' from origin '[https://news-pulse-tvh9.vercel.app](https://news-pulse-tvh9.vercel.app)' has been blocked by CORS policy
+Access to fetch at 'https://news-pulse-2xcf.onrender.com/clusters' from origin 'https://news-pulse-tvh9.vercel.app' has been blocked by CORS policy
 
 ```
 
-**Solution:** Ensure `CORS(app)` is enabled in Flask and the Vercel domain is in the allowed origins list.
+**Solution:** Ensure CORS is configured correctly in both backends and the Vercel domain is in the allowed origins list.
 
-**4. Image Loading Failures**
-
-```text
-404: /proxy-image?url=...
-
-```
-
-**Solution:** The frontend now uses direct image URLs. If still failing, check the image URL format in the database.
-
-**5. Render Free Tier Sleep**
+**4. Render Free Tier Sleep**
 
 ```text
 Your free instance will spin down with inactivity...
@@ -1175,12 +744,7 @@ Your free instance will spin down with inactivity...
 
 **Solution:** Set up cron-job.org to ping `/health` every 5 minutes.
 
-### Logs & Monitoring
-
-* **Backend Logs:** Render Dashboard → Service → Logs
-* **Frontend Logs:** Vercel Dashboard → Project → Deployments → Logs
-* **Database Logs:** Neon Dashboard → Database → Activity
-* **Error Tracking:** Check the `scrape_runs` table for job history
+---
 
 ## Contributing
 
@@ -1190,9 +754,13 @@ Your free instance will spin down with inactivity...
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+---
+
 ## License
 
 This project is open-source and available under the [MIT License](https://www.google.com/search?q=LICENSE).
+
+---
 
 ## Contact
 
@@ -1202,10 +770,13 @@ Built by **Mitul Pabri**
 * **Project Repository:** [https://github.com/MrMan003/news--pulse](https://github.com/MrMan003/news--pulse)
 * **Live Demo:** [https://news-pulse-tvh9.vercel.app](https://news-pulse-tvh9.vercel.app)
 
+---
+
 ## Acknowledgments
 
 * **Render** for providing free backend hosting
 * **Vercel** for providing free frontend hosting
 * **Neon** for providing free PostgreSQL hosting
-* **OpenAI** for inspiration on clustering algorithms
 * All open-source libraries used in this project
+
+---
